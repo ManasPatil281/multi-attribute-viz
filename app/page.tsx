@@ -5,9 +5,13 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ArrowRight, BarChart3, LineChart, Zap, Upload, TrendingUp, Sparkles } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
+import { useRouter } from "next/navigation"
 
 export default function LandingPage() {
   const [isHovering, setIsHovering] = useState(false)
+  const { user, logout } = useAuth()
+  const router = useRouter()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -24,12 +28,34 @@ export default function LandingPage() {
             <Link href="/dashboard" className="text-slate-300 hover:text-white transition">
               Dashboard
             </Link>
-            <Button variant="outline" className="border-slate-700 text-slate-300 hover:text-white bg-transparent">
-              Sign In
-            </Button>
-            <Button className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700" asChild>
-              <Link href="/dashboard">Get Started</Link>
-            </Button>
+            {user ? (
+              <>
+                <span className="text-slate-300">Hi, {user.name}</span>
+                <Button 
+                  variant="outline" 
+                  className="border-slate-700 text-slate-300 hover:text-white bg-transparent"
+                  onClick={logout}
+                >
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant="outline" 
+                  className="border-slate-700 text-slate-300 hover:text-white bg-transparent"
+                  onClick={() => router.push('/auth')}
+                >
+                  Sign In
+                </Button>
+                <Button 
+                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                  onClick={() => router.push('/auth')}
+                >
+                  Get Started
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </nav>

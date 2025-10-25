@@ -3,8 +3,9 @@
 import { useState, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Upload, AlertCircle } from "lucide-react"
+import { Upload, AlertCircle, CheckCircle } from "lucide-react"
 import Papa from "papaparse"
+import { useAuth } from "@/context/AuthContext"
 
 interface FileUploadSectionProps {
   onDataUpload: (data: any[], filename?: string) => void
@@ -14,15 +15,49 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+  const { token } = useAuth()
+
+  const uploadToS3 = async (file: File) => {
+    if (!token) {
+      console.warn('User not authenticated, skipping S3 upload')
+      return
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/upload-csv', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to upload to S3')
+      }
+
+      const result = await response.json()
+      setUploadSuccess(`File uploaded to S3: ${result.fileName}`)
+      setTimeout(() => setUploadSuccess(null), 5000)
+    } catch (err) {
+      console.error('S3 upload error:', err)
+      // Don't show error to user, just log it
+    }
+  }
 
   const handleFile = useCallback(
     (file: File) => {
       setError(null)
+      setUploadSuccess(null)
       setIsProcessing(true)
 
       const reader = new FileReader()
 
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const text = e.target?.result as string
 
@@ -30,9 +65,15 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
             Papa.parse(text, {
               header: true,
               skipEmptyLines: true,
-              complete: (results) => {
+              complete: async (results) => {
                 if (results.data && results.data.length > 0) {
                   onDataUpload(results.data, file.name)
+                  
+                  // Upload to S3 if user is authenticated
+                  if (token) {
+                    await uploadToS3(file)
+                  }
+                  
                   setIsProcessing(false)
                 } else {
                   setError("CSV file is empty or invalid")
@@ -75,7 +116,7 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
 
       reader.readAsText(file)
     },
-    [onDataUpload],
+    [onDataUpload, token],
   )
 
   const handleDrop = useCallback(
@@ -136,6 +177,13 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
           </>
         )}
       </div>
+
+      {uploadSuccess && (
+        <div className="mt-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+          <p className="text-green-300 text-sm">{uploadSuccess}</p>
+        </div>
+      )}
 
       {error && (
         <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-3">
