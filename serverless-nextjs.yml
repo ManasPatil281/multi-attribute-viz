@@ -1,0 +1,32 @@
+streamlineAnalyst:
+  component: "@sls-next/serverless-component@3.7.0"
+  inputs:
+    name:
+      defaultLambda: streamline-analyst-lambda
+      apiLambda: streamline-analyst-api
+    bucketName: streamline-analyst-nextjs-bucket
+    cloudfront:
+      comment: "Streamline Analyst - Next.js app deployed via Serverless"
+      priceClass: PriceClass_100
+      distributionId:
+        - streamline-analyst
+      certificateArn: ${env:CERTIFICATE_ARN}
+      aliases:
+        - ${env:DOMAIN_NAME}
+    domain:
+      - ${env:DOMAIN_NAME}
+    runtime:
+      defaultLambda: nodejs20.x
+      apiLambda: nodejs20.x
+    memory:
+      defaultLambda: 1024
+      apiLambda: 1024
+    timeout:
+      defaultLambda: 30
+      apiLambda: 30
+    environment:
+      GROQ_API_KEY: ${env:GROQ_API_KEY}
+      AWS_REGION: ${env:AWS_REGION}
+      AWS_DYNAMODB_TABLE_NAME: ${env:AWS_DYNAMODB_TABLE_NAME}
+      AWS_S3_BUCKET_NAME: ${env:AWS_S3_BUCKET_NAME}
+      JWT_SECRET: ${env:JWT_SECRET}

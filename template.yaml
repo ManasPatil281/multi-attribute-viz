@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Streamline Analyst Next.js Application
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 1024
+    Runtime: nodejs20.x
+    Environment:
+      Variables:
+        GROQ_API_KEY: !Ref GroqApiKey
+        AWS_DYNAMODB_TABLE_NAME: !Ref UsersTable
+        AWS_S3_BUCKET_NAME: !Ref CSVBucket
+        JWT_SECRET: !Ref JWTSecret
+
+Parameters:
+  GroqApiKey:
+    Type: String
+    NoEcho: true
+  JWTSecret:
+    Type: String
+    NoEcho: true
+
+Resources:
+  NextJsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      CodeUri: .next/standalone/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - S3CrudPolicy:
+            BucketName: !Ref CSVBucket
+      Events:
+        Api:
+          Type: HttpApi
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: cc-mini-proj-dynamo
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: username
+          AttributeType: S
+      KeySchema:
+        - AttributeName: username
+          KeyType: HASH
+
+  CSVBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: cc-mini-project-nid
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+              - DELETE
+            AllowedHeaders:
+              - '*'
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/'

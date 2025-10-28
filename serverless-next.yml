@@ -1,0 +1,23 @@
+myNextApp:
+  component: "@sls-next/serverless-component@3.7.0"
+  inputs:
+    bucketName: streamline-analyst-${env:STAGE, 'dev'}
+    name:
+      defaultLambda: streamline-analyst-default-${env:STAGE, 'dev'}
+      apiLambda: streamline-analyst-api-${env:STAGE, 'dev'}
+    runtime:
+      defaultLambda: nodejs20.x
+      apiLambda: nodejs20.x
+    memory:
+      defaultLambda: 1024
+      apiLambda: 1024
+    timeout:
+      defaultLambda: 30
+      apiLambda: 30
+    build:
+      env:
+        GROQ_API_KEY: ${env:GROQ_API_KEY}
+        AWS_REGION: ${env:AWS_REGION}
+        AWS_DYNAMODB_TABLE_NAME: ${env:AWS_DYNAMODB_TABLE_NAME}
+        AWS_S3_BUCKET_NAME: ${env:AWS_S3_BUCKET_NAME}
+        JWT_SECRET: ${env:JWT_SECRET}

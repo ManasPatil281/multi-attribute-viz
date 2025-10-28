@@ -1,0 +1,18 @@
+myNextApp:
+  component: "@sls-next/serverless-component@latest"
+  inputs:
+    name:
+      defaultLambda: streamline-analyst-lambda
+      apiLambda: streamline-analyst-api-lambda
+    bucketName: streamline-analyst-app-bucket
+    cloudfront:
+      comment: "Streamline Analyst - Next.js Data Visualization Platform"
+      priceClass: PriceClass_100
+    build:
+      args:
+        - build
+      env:
+        NEXT_TELEMETRY_DISABLED: "1"
+    domain:
+      - yourdomain.com
+      - www.yourdomain.com

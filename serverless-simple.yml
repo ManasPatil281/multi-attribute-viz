@@ -1,0 +1,12 @@
+streamlineAnalyst:
+  component: '@sls-next/serverless-component@3.7.0'
+
+  inputs:
+    bucketName: streamline-analyst-nextjs-bucket
+    
+    build:
+      env:
+        GROQ_API_KEY: ${env:GROQ_API_KEY}
+        AWS_DYNAMODB_TABLE_NAME: cc-mini-proj-dynamo
+        AWS_S3_BUCKET_NAME: cc-mini-project-nid
+        JWT_SECRET: ${env:JWT_SECRET}

@@ -2,55 +2,70 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-interface User {
+interface CognitoUser {
   username: string;
   email: string;
   name: string;
+  sub: string;
 }
 
 interface AuthContextType {
-  user: User | null;
-  token: string | null;
-  login: (username: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, name: string, username: string) => Promise<void>;
-  logout: () => void;
+  user: CognitoUser | null;
+  accessToken: string | null;
+  refreshToken: string | null;
   isLoading: boolean;
+  login: (username: string, password: string, newPassword?: string, session?: string) => Promise<void>;
+  signup: (email: string, password: string, name: string, username: string) => Promise<void>;
+  confirmSignup: (username: string, confirmationCode: string) => Promise<void>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<CognitoUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshTokenValue, setRefreshToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
+    const storedAccessToken = localStorage.getItem('accessToken');
+    const storedRefreshToken = localStorage.getItem('refreshToken');
     const storedUser = localStorage.getItem('user');
-    
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+
+    if (storedAccessToken && storedUser) {
+      const userInfo = verifyToken(storedAccessToken);
+      if (userInfo) {
+        setAccessToken(storedAccessToken);
+        setRefreshToken(storedRefreshToken);
+        setUser(JSON.parse(storedUser));
+      }
     }
     setIsLoading(false);
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, newPassword?: string, session?: string) => {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, newPassword, session }),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Login failed');
+    const data = await response.json();
+
+    if (data.challenge === 'NEW_PASSWORD_REQUIRED') {
+      throw { message: 'NEW_PASSWORD_REQUIRED', session: data.session, challenge: data.challenge };
     }
 
-    const data = await response.json();
-    setToken(data.token);
+    if (!response.ok) {
+      throw new Error(data.error || 'Login failed');
+    }
+
+    setAccessToken(data.accessToken);
+    setRefreshToken(data.refreshToken);
     setUser(data.user);
-    localStorage.setItem('token', data.token);
+    localStorage.setItem('accessToken', data.accessToken);
+    localStorage.setItem('refreshToken', data.refreshToken);
     localStorage.setItem('user', JSON.stringify(data.user));
   };
 
@@ -67,21 +82,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await response.json();
-    setToken(data.token);
-    setUser(data.user);
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
+    return data;
+  };
+
+  const confirmSignup = async (username: string, confirmationCode: string) => {
+    const response = await fetch('/api/auth/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, confirmationCode }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Confirmation failed');
+    }
+
+    return await response.json();
   };
 
   const logout = () => {
-    setToken(null);
     setUser(null);
-    localStorage.removeItem('token');
+    setAccessToken(null);
+    setRefreshToken(null);
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, signup, logout, isLoading }}>
+    <AuthContext.Provider value={{
+      user,
+      accessToken,
+      refreshToken: refreshTokenValue,
+      isLoading,
+      login,
+      signup,
+      confirmSignup,
+      logout,
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -93,4 +131,22 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+function verifyToken(token: string) {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      return null;
+    }
+
+    return {
+      username: payload['cognito:username'],
+      email: payload.email,
+      sub: payload.sub,
+    };
+  } catch {
+    return null;
+  }
 }

@@ -37,6 +37,44 @@ Multi-attribute data visualization and analysis platform with AI-powered insight
    npm run dev
    ```
 
+## Deployment
+
+### Using Serverless Framework
+
+1. Install Serverless CLI:
+   ```bash
+   npm install -g serverless
+   ```
+
+2. Configure AWS credentials:
+   ```bash
+   serverless config credentials --provider aws --key YOUR_KEY --secret YOUR_SECRET
+   ```
+
+3. Deploy to AWS:
+   ```bash
+   npm run deploy
+   ```
+
+4. Deploy to production:
+   ```bash
+   npm run deploy:prod
+   ```
+
+### Environment Variables for Production
+
+Make sure to set these in your AWS Lambda environment or use AWS Secrets Manager:
+- `GROQ_API_KEY`
+- `AWS_DYNAMODB_TABLE_NAME`
+- `AWS_S3_BUCKET_NAME`
+- `JWT_SECRET`
+
+### Remove Deployment
+
+```bash
+npm run remove
+```
+
 ## Environment Variables
 
 See `.env.example` for required environment variables.
