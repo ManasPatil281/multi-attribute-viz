@@ -8,6 +8,10 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Send, Bot, User, Loader2 } from "lucide-react"
 import { useData } from "@/contexts/data-context"
 import { queryDataWithGroq } from "@/lib/groq"
+import ReactMarkdown from 'react-markdown'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import remarkGfm from 'remark-gfm'
 
 interface Message {
   role: "user" | "assistant"
@@ -160,7 +164,62 @@ ${JSON.stringify(sampleData, null, 2)}`
                       : "bg-slate-700 text-slate-200"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  {message.role === "assistant" ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        code({ node, inline, className, children, ...props }) {
+                          const match = /language-(\w+)/.exec(className || '')
+                          return !inline && match ? (
+                            <SyntaxHighlighter
+                              style={oneDark}
+                              language={match[1]}
+                              PreTag="div"
+                              className="rounded-md text-sm"
+                              {...props}
+                            >
+                              {String(children).replace(/\n$/, '')}
+                            </SyntaxHighlighter>
+                          ) : (
+                            <code className="bg-slate-600 px-1 py-0.5 rounded text-sm" {...props}>
+                              {children}
+                            </code>
+                          )
+                        },
+                        h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-lg font-bold mb-2">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-base font-bold mb-1">{children}</h3>,
+                        p: ({ children }) => <p className="mb-2">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                        li: ({ children }) => <li>{children}</li>,
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-4 border-cyan-400 pl-4 italic text-slate-300 mb-2">
+                            {children}
+                          </blockquote>
+                        ),
+                        table: ({ children }) => (
+                          <div className="overflow-x-auto mb-2">
+                            <table className="min-w-full border-collapse border border-slate-600">
+                              {children}
+                            </table>
+                          </div>
+                        ),
+                        th: ({ children }) => (
+                          <th className="border border-slate-600 px-2 py-1 bg-slate-600 text-left font-semibold">
+                            {children}
+                          </th>
+                        ),
+                        td: ({ children }) => (
+                          <td className="border border-slate-600 px-2 py-1">{children}</td>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  )}
                   <span className="text-xs opacity-50 mt-1 block">
                     {message.timestamp.toLocaleTimeString()}
                   </span>

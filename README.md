@@ -111,3 +111,46 @@ See `.env.example` for required environment variables.
 - Use AWS Secrets Manager for production secrets
 - Rotate JWT secrets periodically
 - Monitor AWS CloudTrail for suspicious activity
+
+## If node/npm not detected in your shell
+
+If your shell can't find node or npm but Node is installed at D:\node, use the provided wrappers from the project root:
+
+- Windows CMD
+  - Install deps: run-install.bat
+  - Start dev server: run-dev.bat
+
+- PowerShell
+  - Start dev server: .\run-dev.ps1
+
+These wrappers invoke D:\node\npm.cmd directly so you don't need to fix PATH immediately. Prefer fixing system PATH if possible (add D:\node to PATH), then use normal npm commands.
+
+## Troubleshooting: Cognito PostAuthentication Lambda error
+
+If your login requests fail with an error like:
+- UserLambdaValidationException: PostAuthentication failed with error "exports is not defined in ES module scope"
+
+Cause:
+- The Cognito PostAuthentication trigger Lambda is running in an ES module environment while the handler code uses CommonJS-style exports (e.g. `module.exports` or `exports.handler`), causing a runtime validation failure.
+
+Quick fixes:
+- Convert the Lambda handler to ES module syntax:
+  - Replace CommonJS exports with an ESM export:
+    - Example: `export const handler = async (event) => { /* ... */ }`
+- Or ensure the Lambda package is built as CommonJS (configure your bundler/transpiler to output CJS for that function or set `"type": "commonjs"` in that function's package.json).
+- Re-deploy the PostAuthentication Lambda after the change.
+
+Notes:
+- The API now returns a 502 with a clear remediation message when this specific error occurs.
+- Do not include secrets in repository files. If any credentials were exposed, rotate them immediately.
+
+Example change for a Lambda handler (ESM):
+```js
+// index.mjs
+export const handler = async (event) => {
+  // ... your code ...
+  return event;
+};
+```
+
+If you need help rebuilding or reconfiguring the Lambda packaging, use your build tooling (esbuild/webpack/tsc) to output CommonJS for that function, or update the runtime packaging to match module format.

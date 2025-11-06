@@ -1,7 +1,7 @@
 export async function queryDataWithGroq(
   question: string,
   dataContext: string
-): Promise<string> {
+) {
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -21,7 +21,7 @@ export async function queryDataWithGroq(
     const data = await response.json();
     return data.response;
   } catch (error) {
-    console.error('Chat API error:', error);
-    throw new Error('Failed to get response from AI');
+    console.error('Error querying Groq:', error);
+    throw error;
   }
 }

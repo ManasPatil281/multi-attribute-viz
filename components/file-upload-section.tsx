@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Upload, AlertCircle, CheckCircle } from "lucide-react"
 import Papa from "papaparse"
 import { useAuth } from "@/context/AuthContext"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface FileUploadSectionProps {
   onDataUpload: (data: any[], filename?: string) => void
@@ -15,11 +16,11 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
-  const { token } = useAuth()
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const { accessToken } = useAuth()
 
   const uploadToS3 = async (file: File) => {
-    if (!token) {
+    if (!accessToken) {
       console.warn('User not authenticated, skipping S3 upload')
       return
     }
@@ -28,31 +29,40 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch('/api/upload-csv', {
+      console.log('Uploading file to S3:', file.name)
+
+      const response = await fetch('/api/upload', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
         body: formData,
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        throw new Error('Failed to upload to S3')
+        throw new Error(result.error || 'Upload to S3 failed')
       }
 
-      const result = await response.json()
-      setUploadSuccess(`File uploaded to S3: ${result.fileName}`)
-      setTimeout(() => setUploadSuccess(null), 5000)
-    } catch (err) {
+      console.log('File uploaded to S3 successfully:', result)
+      setMessage({ 
+        type: 'success', 
+        text: `✅ File uploaded to S3: ${file.name}` 
+      })
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setMessage(null), 5000)
+    } catch (err: any) {
       console.error('S3 upload error:', err)
-      // Don't show error to user, just log it
+      setMessage({ 
+        type: 'error', 
+        text: `❌ S3 upload failed: ${err.message || 'Unknown error'}` 
+      })
     }
   }
 
   const handleFile = useCallback(
     (file: File) => {
       setError(null)
-      setUploadSuccess(null)
+      setMessage(null)
       setIsProcessing(true)
 
       const reader = new FileReader()
@@ -65,13 +75,19 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
             Papa.parse(text, {
               header: true,
               skipEmptyLines: true,
-              complete: async (results) => {
+              complete: async (results: any) => {
                 if (results.data && results.data.length > 0) {
+                  // Update local data context first
                   onDataUpload(results.data, file.name)
                   
-                  // Upload to S3 if user is authenticated
-                  if (token) {
+                  // Then upload to S3 if authenticated
+                  if (accessToken) {
                     await uploadToS3(file)
+                  } else {
+                    setMessage({ 
+                      type: 'success', 
+                      text: `✅ File loaded: ${file.name} (${results.data.length} rows)` 
+                    })
                   }
                   
                   setIsProcessing(false)
@@ -80,7 +96,7 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
                   setIsProcessing(false)
                 }
               },
-              error: (error) => {
+              error: (error: any) => {
                 setError(`CSV parsing error: ${error.message}`)
                 setIsProcessing(false)
               },
@@ -91,11 +107,15 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
               const dataArray = Array.isArray(json) ? json : [json]
               if (dataArray.length > 0) {
                 onDataUpload(dataArray, file.name)
+                setMessage({ 
+                  type: 'success', 
+                  text: `✅ File loaded: ${file.name} (${dataArray.length} rows)` 
+                })
               } else {
                 setError("JSON file is empty")
               }
               setIsProcessing(false)
-            } catch (error) {
+            } catch (error: any) {
               setError("Invalid JSON file format")
               setIsProcessing(false)
             }
@@ -103,7 +123,7 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
             setError("Unsupported file format. Please upload CSV or JSON files.")
             setIsProcessing(false)
           }
-        } catch (error) {
+        } catch (error: any) {
           setError("Error reading file")
           setIsProcessing(false)
         }
@@ -116,7 +136,7 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
 
       reader.readAsText(file)
     },
-    [onDataUpload, token],
+    [onDataUpload, accessToken],
   )
 
   const handleDrop = useCallback(
@@ -139,7 +159,7 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
   )
 
   return (
-    <Card className="bg-slate-800/50 border-slate-700 p-12">
+    <Card className="bg-slate-800/50 border-slate-700">
       <div
         className={`border-2 border-dashed rounded-lg p-12 text-center transition ${
           isDragging ? "border-cyan-500 bg-cyan-500/10" : "border-slate-600 hover:border-slate-500"
@@ -178,18 +198,24 @@ export default function FileUploadSection({ onDataUpload }: FileUploadSectionPro
         )}
       </div>
 
-      {uploadSuccess && (
-        <div className="mt-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-center gap-3">
-          <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-          <p className="text-green-300 text-sm">{uploadSuccess}</p>
-        </div>
-      )}
-
       {error && (
         <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
           <p className="text-red-300 text-sm">{error}</p>
         </div>
+      )}
+
+      {message && (
+        <Alert className={message.type === 'success' ? 'bg-green-500/10 border-green-500/30 mt-4' : 'bg-red-500/10 border-red-500/30 mt-4'}>
+          {message.type === 'success' ? (
+            <CheckCircle className="h-4 w-4 text-green-400" />
+          ) : (
+            <AlertCircle className="h-4 w-4 text-red-400" />
+          )}
+          <AlertDescription className={message.type === 'success' ? 'text-green-300' : 'text-red-300'}>
+            {message.text}
+          </AlertDescription>
+        </Alert>
       )}
     </Card>
   )

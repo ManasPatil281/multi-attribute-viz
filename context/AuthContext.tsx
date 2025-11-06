@@ -33,12 +33,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedRefreshToken = localStorage.getItem('refreshToken');
     const storedUser = localStorage.getItem('user');
 
-    if (storedAccessToken && storedUser) {
-      const userInfo = verifyToken(storedAccessToken);
-      if (userInfo) {
+    if (storedAccessToken && storedRefreshToken && storedUser) {
+      try {
         setAccessToken(storedAccessToken);
         setRefreshToken(storedRefreshToken);
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+      } catch (error) {
+        console.error('Failed to parse stored user data:', error);
+        localStorage.removeItem('user');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        setUser(null);
+        setAccessToken(null);
+        setRefreshToken(null);
       }
     }
     setIsLoading(false);
@@ -61,12 +69,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error || 'Login failed');
     }
 
-    setAccessToken(data.accessToken);
-    setRefreshToken(data.refreshToken);
-    setUser(data.user);
     localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
-    localStorage.setItem('user', JSON.stringify(data.user));
+    localStorage.setItem('refreshToken', data.refreshToken || '');
+
+    if (data.user) {
+      localStorage.setItem('user', JSON.stringify(data.user));
+    }
+
+    setAccessToken(data.accessToken);
+    setRefreshToken(data.refreshToken || null);
+    setUser(data.user || null);
   };
 
   const signup = async (email: string, password: string, name: string, username: string) => {
@@ -110,16 +122,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      accessToken,
-      refreshToken: refreshTokenValue,
-      isLoading,
-      login,
-      signup,
-      confirmSignup,
-      logout,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        accessToken,
+        refreshToken: refreshTokenValue,
+        isLoading,
+        login,
+        signup,
+        confirmSignup,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -131,22 +145,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
-
-function verifyToken(token: string) {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-      return null;
-    }
-
-    return {
-      username: payload['cognito:username'],
-      email: payload.email,
-      sub: payload.sub,
-    };
-  } catch {
-    return null;
-  }
 }
